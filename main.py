@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
-"""Unsent micro-confession: a text that was drafted, never sent.
+"""Unsent in two lines: a "To:" line, then the message itself, kept short enough for the 260-character gate.
+Unsent micro-confession: a text that was drafted, never sent.
 
 The entry is a two-line draft message. Line one names the recipient,
 line two is the confession itself — the call the author keeps rehearsing
