@@ -9,7 +9,7 @@ Two lines, 173 characters, for a confession that stayed in drafts:
 > To: Dad
 > I still rehearse the call where I tell you I quit the degree you paid for, then hang up on the third ring because your pride is the only thing I haven't broken yet.
 
-The confession: a To: line naming who it was meant for, and the message itself, one line exactly as it was typed — a call rehearsed and never made, because the pride of the person who paid for the degree is the only thing not yet broken. The third-ring hang-up is the concrete image of a message that stayed in drafts: too honest, too late, too afraid to send.
+What the two lines do: the "To:" line names who the confession was meant for, and the message is the call rehearsed and never made — quitting the degree he paid for, hanging up on the third ring, because his pride is the one thing not yet broken. The third-ring hang-up is the concrete image of a message that stayed in drafts: too honest, too late, too afraid to send. Nothing here is invented for effect; the whole entry is that one unsent moment, kept short enough to fit the sprint's 260-character gate.
 
 ## Run it
 

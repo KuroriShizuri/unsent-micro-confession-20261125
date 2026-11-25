@@ -1,19 +1,26 @@
 #!/usr/bin/env python3
 """Unsent: The Micro-Confession Sprint - make.fun entry.
 
-Writes exactly two lines (a "To: ..." line plus the unsent message,
-one line exactly as typed) to $MAKEFUN_OUTPUT_DIR/entry.txt.
-Stdlib only, deterministic, no network."""
+The program writes one unsent confession to entry.txt: a "To: ..."
+address line followed by the message itself, exactly one line as typed.
+Output goes to $MAKEFUN_OUTPUT_DIR/entry.txt. Pure stdlib, fully
+deterministic, and it never touches the network. The entry is a
+constant in this file, so every run produces the same two lines.
+"""
 import os
 import sys
 
 ENTRY = "To: Dad\nI still rehearse the call where I tell you I quit the degree you paid for, then hang up on the third ring because your pride is the only thing I haven't broken yet."
 MAX_CHARS = 260
+MESSAGE_LIMIT = 200
 
 
 def validate(text):
+    """Check a candidate entry against the sprint's character gates."""
     if not text or not text.strip():
         raise ValueError("entry is empty or whitespace-only")
+    # The file holds the entry plus one trailing newline, so the gate
+    # counts that extra byte as well.
     if len(text) + 1 > MAX_CHARS:
         raise ValueError(
             "entry file would be %d chars, over the %d-char gate"
@@ -24,16 +31,16 @@ def validate(text):
         raise ValueError("entry must be exactly two lines")
     if not lines[0].startswith("To: "):
         raise ValueError("first line must be a \"To: ...\" line")
-    if len(lines[1]) > 200:
+    if len(lines[1]) > MESSAGE_LIMIT:
         raise ValueError(
-            "message line is %d chars, over the 200-char limit"
-            % len(lines[1])
+            "message line is %d chars, over the %d-char limit"
+            % (len(lines[1]), MESSAGE_LIMIT)
         )
     return text
 
 
 def validate_written(path):
-    """Read entry.txt back from disk and re-validate the artifact itself."""
+    """Read entry.txt back from disk and re-check the artifact itself."""
     with open(path, "rb") as f:
         raw = f.read()
     try:
@@ -47,6 +54,7 @@ def validate_written(path):
 
 
 def write_entry():
+    """Write the validated entry to entry.txt and confirm the round trip."""
     out_dir = os.environ.get("MAKEFUN_OUTPUT_DIR", ".")
     target = os.path.join(out_dir, "entry.txt")
     os.makedirs(out_dir, exist_ok=True)
