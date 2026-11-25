@@ -1,89 +1,124 @@
 #!/usr/bin/env python3
-"""Unsent: The Micro-Confession Sprint - make.fun entry.
+"""Unsent micro-confession: a text that was drafted, never sent.
 
-The program writes one unsent confession to entry.txt: a "To: ..."
-address line followed by the message itself, exactly one line as typed.
-Output goes to $MAKEFUN_OUTPUT_DIR/entry.txt. Pure stdlib, fully
-deterministic, and it never touches the network. The entry is a
-constant in this file, so every run produces the same two lines.
+The entry is a two-line draft message. Line one names the recipient,
+line two is the confession itself — the call the author keeps rehearsing
+and never makes. This script exists only to protect that wording: it
+checks the draft against the competition's limits and hands the exact
+bytes to the make.fun harness as entry.txt.
+
+Usage:
+    python3 main.py              write entry.txt (default: current dir)
+    python3 main.py --check      validate the draft, write nothing
+    python3 main.py --self-test  validate, write, then re-read the file
+                                 from disk and confirm it matches
+
+The output directory comes from MAKEFUN_OUTPUT_DIR; when that variable
+is unset the current directory is used. Only the standard library is
+used and no network access happens.
 """
+
 import os
 import sys
 
-ENTRY = "To: Dad\nI still rehearse the call where I tell you I quit the degree you paid for, then hang up on the third ring because your pride is the only thing I haven't broken yet."
-MAX_CHARS = 260
-MESSAGE_LIMIT = 200
+ENTRY = (
+    "To: Dad\n"
+    "I still rehearse the call where I tell you I quit the degree you paid "
+    "for, then hang up on the third ring because your pride is the only "
+    "thing I haven't broken yet."
+)
+
+MAX_TOTAL_CHARS = 260
+MAX_MESSAGE_CHARS = 200
+EXPECTED_LINE_COUNT = 2
+OUTPUT_FILENAME = "entry.txt"
 
 
-def validate(text):
-    """Check a candidate entry against the sprint's character gates."""
-    if not text or not text.strip():
-        raise ValueError("entry is empty or whitespace-only")
-    # The file holds the entry plus one trailing newline, so the gate
-    # counts that extra byte as well.
-    if len(text) + 1 > MAX_CHARS:
-        raise ValueError(
-            "entry file would be %d chars, over the %d-char gate"
-            % (len(text) + 1, MAX_CHARS)
+def complain(message):
+    """Print a failure to stderr and stop with a non-zero status."""
+    print("error: " + message, file=sys.stderr)
+    raise SystemExit(1)
+
+
+def inspect(draft):
+    """Return a list of every rule the draft breaks (empty means valid)."""
+    faults = []
+    if not draft:
+        faults.append("the entry is empty")
+        return faults
+    lines = draft.split("\n")
+    if len(lines) != EXPECTED_LINE_COUNT:
+        faults.append(
+            "expected %d lines, found %d" % (EXPECTED_LINE_COUNT, len(lines))
         )
-    lines = text.split("\n")
-    if len(lines) != 2:
-        raise ValueError("entry must be exactly two lines")
-    if not lines[0].startswith("To: "):
-        raise ValueError("first line must be a \"To: ...\" line")
-    if len(lines[1]) > MESSAGE_LIMIT:
-        raise ValueError(
-            "message line is %d chars, over the %d-char limit"
-            % (len(lines[1]), MESSAGE_LIMIT)
+    if len(draft) > MAX_TOTAL_CHARS:
+        faults.append(
+            "entry is %d characters, over the %d limit"
+            % (len(draft), MAX_TOTAL_CHARS)
         )
-    return text
+    if len(lines) > 1 and len(lines[1]) > MAX_MESSAGE_CHARS:
+        faults.append(
+            "the message line is %d characters, over the %d limit"
+            % (len(lines[1]), MAX_MESSAGE_CHARS)
+        )
+    if "\r" in draft:
+        faults.append("carriage returns are not allowed")
+    return faults
 
 
-def validate_written(path):
-    """Read entry.txt back from disk and re-check the artifact itself."""
-    with open(path, "rb") as f:
-        raw = f.read()
-    try:
-        text = raw.decode("utf-8")
-    except UnicodeDecodeError as exc:
-        raise ValueError("entry.txt is not valid UTF-8: %s" % exc)
-    validate(text.rstrip("\n"))
-    if text.count("\n") > 2:
-        raise ValueError("entry.txt must be two lines")
-    return text
+def render(draft):
+    """Encode the draft exactly as it must appear on disk."""
+    return (draft + "\n").encode("utf-8")
+
+
+def destination():
+    """Resolve the output folder, creating it when it does not exist."""
+    folder = os.environ.get("MAKEFUN_OUTPUT_DIR") or "."
+    os.makedirs(folder, exist_ok=True)
+    return os.path.join(folder, OUTPUT_FILENAME)
 
 
 def write_entry():
-    """Write the validated entry to entry.txt and confirm the round trip."""
-    out_dir = os.environ.get("MAKEFUN_OUTPUT_DIR", ".")
-    target = os.path.join(out_dir, "entry.txt")
-    os.makedirs(out_dir, exist_ok=True)
-    data = (validate(ENTRY) + "\n").encode("utf-8")
-    with open(target, "wb") as f:
-        f.write(data)
-    with open(target, "rb") as f:
-        if f.read() != data:
-            raise ValueError("entry.txt round-trip mismatch")
-    validate_written(target)
-    return target
+    """Validate, write, then re-read and re-validate the artifact."""
+    faults = inspect(ENTRY)
+    if faults:
+        complain("; ".join(faults))
+    target = destination()
+    payload = render(ENTRY)
+    with open(target, "wb") as handle:
+        handle.write(payload)
+    with open(target, "rb") as handle:
+        on_disk = handle.read()
+    if on_disk != payload:
+        complain("entry.txt on disk does not match the validated entry")
+    round_tripped = on_disk.decode("utf-8")
+    if round_tripped != ENTRY + "\n":
+        complain("entry.txt decoded back to different text")
+    recheck = inspect(round_tripped.rstrip("\n"))
+    if recheck:
+        complain("written artifact fails validation: " + "; ".join(recheck))
+    print("wrote %s (%d bytes)" % (target, len(payload)))
 
 
 def main(argv):
-    if "--self-test" in argv:
-        validate(ENTRY)
-        print("self-test ok: %d chars" % len(ENTRY))
+    flags = set(argv[1:])
+    unknown = flags - {"--check", "--self-test"}
+    if unknown:
+        complain("unknown option(s): " + ", ".join(sorted(unknown)))
+    if "--check" in flags:
+        faults = inspect(ENTRY)
+        if faults:
+            complain("; ".join(faults))
+        print(
+            "check ok: %d lines, %d characters"
+            % (len(ENTRY.split("\n")), len(ENTRY))
+        )
         return 0
-    if "--check" in argv:
-        validate(ENTRY)
-        print("check ok: %d chars, within %d" % (len(ENTRY), MAX_CHARS))
-        return 0
-    try:
-        write_entry()
-    except ValueError as exc:
-        print("invalid entry: %s" % exc, file=sys.stderr)
-        return 1
+    write_entry()
+    if "--self-test" in flags:
+        print("self-test ok")
     return 0
 
 
 if __name__ == "__main__":
-    raise SystemExit(main(sys.argv[1:]))
+    sys.exit(main(sys.argv))
